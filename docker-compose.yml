@@ -1,0 +1,13 @@
+services:
+  nimbusbt:
+    build: .
+    container_name: nimbusbt
+    restart: unless-stopped
+    ports:
+      - "5050:5050"
+    volumes:
+      - ./data:/app/data
+      - ./downloads:/app/downloads
+    environment:
+      - NIMBUSBT_DATA_DIR=/app/data
+      - PORT=5050
