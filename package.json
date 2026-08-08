@@ -3,6 +3,8 @@
   "version": "0.1.0",
   "description": "NimbusBT — a modern, secure, open-source BitTorrent client with a native-style web UI and CLI. Built on WebTorrent.",
   "license": "MIT",
+  "author": "sunritb <https://github.com/sunritb>",
+  "contributors": [],
   "type": "module",
   "main": "src/server.js",
   "bin": {

@@ -90,3 +90,6 @@ npm run test:e2e # end-to-end server + CLI tests
 ## Support the project
 
 Report issues, request features, and contribute at the project repository.
+See [CONTRIBUTORS.md](CONTRIBUTORS.md) and [CONTRIBUTING.md](CONTRIBUTING.md).
+
+Created and maintained by [@sunritb](https://github.com/sunritb).
