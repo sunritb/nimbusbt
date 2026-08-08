@@ -3,6 +3,12 @@
 A modern, privacy-first, open-source BitTorrent client with a web UI and a CLI.
 Built on Node.js + WebTorrent. Works on macOS, Linux, and Windows.
 
+- **Website:** https://sunritb.github.io/nimbusbt
+- **Releases:** https://github.com/sunritb/nimbusbt/releases
+- **Packages:** https://github.com/sunritb/nimbusbt/pkgs/container/nimbusbt
+- **Contributing:** see [CONTRIBUTING.md](CONTRIBUTING.md)
+- **Security:** see [SECURITY.md](SECURITY.md)
+
 ## Features
 
 | Feature | Status |
