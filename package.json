@@ -1,0 +1,38 @@
+{
+  "name": "nimbusbt",
+  "version": "0.1.0",
+  "description": "NimbusBT — a modern, secure, open-source BitTorrent client with a native-style web UI and CLI. Built on WebTorrent.",
+  "license": "MIT",
+  "type": "module",
+  "main": "src/server.js",
+  "bin": {
+    "nimbus": "src/cli.js",
+    "nimbusbt": "src/cli.js"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "cli": "node src/cli.js",
+    "test": "node --test --test-reporter=spec 'test/**/*.test.js'",
+    "test:unit": "node --test --test-reporter=spec 'test/unit/**/*.test.js'",
+    "test:integration": "node --test --test-reporter=spec 'test/integration/**/*.test.js'",
+    "test:e2e": "node test/integration/server.e2e.mjs && node test/integration/cli.e2e.mjs",
+    "lint": "eslint src test desktop",
+    "check": "node --check src/server.js && node --check src/cli.js && node --check src/engine/core.js && node --check src/engine/scheduler.js && node --check src/engine/security.js && node --check src/engine/proxy.js && node --check src/api/routes.js && node --check src/api/auth.js && node --check src/api/ws.js && node --check src/webui/js/app.js && node --check src/webui/js/api.js && node --check desktop/main.js",
+    "desktop": "node desktop/main.js",
+    "desktop:electron": "electron desktop/main.js"
+  },
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "socks": "^2.8.4",
+    "webtorrent": "^3.0.21",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "bittorrent-tracker": "^11.0.2",
+    "eslint": "^9.24.0"
+  }
+}

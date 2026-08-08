@@ -1,0 +1,12 @@
+{
+  "name": "NimbusBT",
+  "short_name": "NimbusBT",
+  "description": "Secure BitTorrent client",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f1317",
+  "theme_color": "#101418",
+  "icons": [
+    { "src": "/icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
