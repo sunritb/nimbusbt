@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process'
 import path from 'node:path'
+import { VERSION } from '../version.js'
 
 /**
  * Security & privacy helpers: peer blocklists (PeerGuardian P2P format),
@@ -62,7 +63,7 @@ export async function loadBlocklist (source, opts = {}) {
   if (!source) return null
   const { loadIPSet } = await import('load-ip-set')
   return new Promise((resolve) => {
-    loadIPSet(source, { headers: { 'user-agent': 'NimbusBT/0.1 (+https://github.com/nimbusbt/nimbusbt)' }, ...opts }, (err, ipSet) => {
+    loadIPSet(source, { headers: { 'user-agent': `NimbusBT/${VERSION} (+https://github.com/nimbusbt/nimbusbt)` }, ...opts }, (err, ipSet) => {
       if (err) return resolve(null)
       resolve(ipSet)
     })

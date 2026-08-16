@@ -8,7 +8,8 @@ const state = {
   settings: {},
   logs: [],
   dirtySettings: null,
-  connected: false
+  connected: false,
+  version: null
 }
 
 const els = {}
@@ -85,7 +86,7 @@ async function init () {
 
   applyTheme()
   connectWS({
-    hello: () => { state.connected = true; els.conn.dataset.on = '1'; els.conn.title = 'Connected' },
+    hello: data => { state.connected = true; state.version = data?.version || state.version; els.conn.dataset.on = '1'; els.conn.title = 'Connected' },
     status: () => {},
     torrent: m => { state.torrents.set(m.hash, m); if (state.view === 'torrents') renderTorrents(); if (state.selected === m.hash) renderDrawer() },
     done: m => {
@@ -630,7 +631,7 @@ function renderAbout () {
   els.view.innerHTML = `
   <div class="settings-grid">
     <div class="card">
-      <h3>NimbusBT 0.1.0</h3>
+      <h3>NimbusBT ${esc(state.version || '')}</h3>
       <p class="hint">A modern, privacy-first BitTorrent client built on Node.js + WebTorrent. No telemetry, no analytics, and all local traffic stays on this machine.</p>
       <table>
         <tbody>
