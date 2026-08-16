@@ -35,6 +35,6 @@
   },
   "devDependencies": {
     "bittorrent-tracker": "^11.0.2",
-    "eslint": "^9.24.0"
+    "eslint": "^10.8.1"
   }
 }
