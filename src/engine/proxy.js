@@ -92,6 +92,10 @@ function normalizeArgs (args) {
 
 function patchedConnect (...args) {
   const { options, cb } = normalizeArgs(args)
+  if (options.path) {
+    // Unix-domain socket, not a TCP peer — never route through a SOCKS proxy.
+    return origConnect(options, cb)
+  }
   const targetHost = String(options.host || 'localhost').replace(/^\[|\]$/g, '')
   const targetPort = Number(options.port)
 
