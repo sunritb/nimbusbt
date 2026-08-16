@@ -81,8 +81,12 @@ async function cmdAdd (config, args) {
   console.log(`Added ${t.name} (${t.infoHash})`)
 }
 
-async function cmdList (config) {
+async function cmdList (config, args) {
   const list = await call(config, 'GET', '/api/torrents')
+  if (args.includes('--json')) {
+    console.log(JSON.stringify(list, null, 2))
+    return
+  }
   const rows = list.map(t => [
     t.name,
     t.paused ? 'paused' : t.done ? 'seeding' : `${Math.round(t.progress * 100)}%`,
@@ -99,6 +103,10 @@ async function cmdList (config) {
 async function cmdStatus (config, args) {
   if (!args.length) throw new Error('Usage: nimbus status <infoHash>')
   const t = await call(config, 'GET', `/api/torrents/${args[0].toLowerCase()}`)
+  if (args.includes('--json')) {
+    console.log(JSON.stringify(t, null, 2))
+    return
+  }
   console.log(`Name:     ${t.name}`)
   console.log(`Hash:     ${t.infoHash}`)
   console.log(`Status:   ${t.done ? 'done/seeding' : t.paused ? 'paused' : 'downloading'}`)
@@ -162,6 +170,10 @@ async function cmdRemove (config, args) {
 async function cmdSettings (config, args) {
   if (!args.length) {
     const s = await call(config, 'GET', '/api/settings')
+    if (args.includes('--json')) {
+      console.log(JSON.stringify(s, null, 2))
+      return
+    }
     console.log(table(Object.entries(s).map(([k, v]) => [k, typeof v === 'object' ? JSON.stringify(v) : String(v)])))
     return
   }
@@ -184,15 +196,15 @@ Usage: nimbus <command> [args]
 Commands:
   add <magnet|.torrent|path> [--path DIR] [--paused] [--private]
   seed <path> [--path DIR] [--private]
-  list                          list torrents
+  list [--json]                 list torrents (JSON for scripts)
   summary                       aggregate stats
-  status <infoHash>             show one torrent
+  status <infoHash> [--json]    show one torrent
   pause <infoHash>
   resume <infoHash>
   recheck <infoHash>            re-verify pieces against disk
   scan <infoHash>               run the malware scanner on a torrent
   remove <infoHash> [--delete-files]
-  settings                      show all settings
+  settings [--json]             show all settings
   settings --key value ...      update settings (e.g. --download_limit 1024)
   version
   help
