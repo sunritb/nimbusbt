@@ -6,8 +6,18 @@ import { timingSafeEqual } from 'node:crypto'
  * or `?token=<token>` (useful for the Web UI + scripts).
  * Request origin is checked against the configured CORS allow-list; anything
  * other than a localhost origin must present an Origin header that is allowed.
+ *
+ * Failed attempts are rate-limited per source IP so a token can't be
+ * brute-forced over the network. Successful auth clears the counter.
  */
-export function createAuth (settings) {
+const RATE_WINDOW_MS = 60_000
+const RATE_MAX_ATTEMPTS = 20
+
+export function createAuth (settings, opts = {}) {
+  const windowMs = opts.windowMs ?? RATE_WINDOW_MS
+  const maxAttempts = opts.maxAttempts ?? RATE_MAX_ATTEMPTS
+  const failures = new Map()
+
   function valid (token) {
     const expected = settings.get('api_token')
     if (!expected || !token) return false
@@ -17,25 +27,39 @@ export function createAuth (settings) {
     return timingSafeEqual(a, b)
   }
 
-  function authMiddleware (req, res, next) {
+  function tooManyAttempts (key, now = Date.now()) {
+    const rec = failures.get(key)
+    if (!rec || now - rec.at > windowMs) {
+      failures.set(key, { at: now, count: 1 })
+      return false
+    }
+    rec.count += 1
+    return rec.count > maxAttempts
+  }
+
+  function extractToken (req) {
     const header = req.headers.authorization || ''
-    const token =
+    return (
       (header.startsWith('Bearer ') && header.slice(7)) ||
       req.headers['x-nimbus-token'] ||
       req.query.token
+    )
+  }
 
-    if (valid(token)) return next()
-
+  function authMiddleware (req, res, next) {
+    const token = extractToken(req)
+    if (valid(token)) {
+      failures.delete(req.socket?.remoteAddress || 'unknown')
+      return next()
+    }
+    if (tooManyAttempts(req.socket?.remoteAddress || 'unknown')) {
+      return res.status(429).json({ error: 'Too many failed attempts. Try again in a minute.' })
+    }
     res.status(401).json({ error: 'Unauthorized', message: 'A valid API token is required.' })
   }
 
   function optionalAuth (req, res, next) {
-    const header = req.headers.authorization || ''
-    const token =
-      (header.startsWith('Bearer ') && header.slice(7)) ||
-      req.headers['x-nimbus-token'] ||
-      req.query.token
-    req.isAuthed = valid(token)
+    req.isAuthed = valid(extractToken(req))
     next()
   }
 
