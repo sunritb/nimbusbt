@@ -5,6 +5,7 @@ import WebTorrent from 'webtorrent'
 import { SpeedScheduler } from './scheduler.js'
 import { applyBlocklist, scanPaths, checkVirusTotal, ipLeakWarning } from './security.js'
 import { enableProxy, disableProxy } from './proxy.js'
+import { countSetBits, serializeBitfield } from './bitfield.js'
 import { upsert } from '../db.js'
 
 const STATS_INTERVAL = 1000
@@ -554,11 +555,7 @@ export class TorrentCore extends EventEmitter {
 
   _persistBitfield (torrent, stmt = this.db.prepare('UPDATE torrents SET bitfield = ? WHERE info_hash = ?')) {
     if (!torrent.bitfield || !torrent.pieces?.length) return
-    const bytes = new Uint8Array(Math.ceil(torrent.pieces.length / 8))
-    for (let i = 0; i < torrent.pieces.length; i++) {
-      if (torrent.bitfield.get(i)) bytes[i >> 3] |= (0x80 >> (i & 7))
-    }
-    stmt.run(Buffer.from(bytes), torrent.infoHash)
+    stmt.run(Buffer.from(serializeBitfield(torrent.bitfield, torrent.pieces.length)), torrent.infoHash)
   }
 
   async _restoreFromDb () {
@@ -599,19 +596,4 @@ export class TorrentCore extends EventEmitter {
     if (this.listenerCount('status') === 0) return
     this.emit('status', this.getStatuses())
   }
-}
-
-const POPCOUNT = new Uint8Array(256)
-for (let i = 0; i < 256; i++) POPCOUNT[i] = (i & 1) + POPCOUNT[i >> 1]
-
-function countSetBits (buf, total) {
-  if (!buf) return 0
-  const full = Math.min(Math.floor(total / 8), buf.length)
-  let n = 0
-  for (let i = 0; i < full; i++) n += POPCOUNT[buf[i]]
-  const tail = total & 7
-  if (tail && full < buf.length) {
-    n += POPCOUNT[buf[full] & (0xff << (8 - tail))]
-  }
-  return n
 }
