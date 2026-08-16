@@ -84,6 +84,10 @@ export function openDb (dir) {
   mkdirSync(target, { recursive: true })
   const db = new DatabaseSync(path.join(target, 'nimbusbt.db'))
   db.exec('PRAGMA journal_mode = WAL;')
+  db.exec('PRAGMA synchronous = NORMAL;')
+  db.exec('PRAGMA journal_size_limit = 67108864;')
+  db.exec('PRAGMA temp_store = MEMORY;')
+  db.exec('PRAGMA busy_timeout = 5000;')
   db.exec('PRAGMA foreign_keys = ON;')
   db.exec(SCHEMA)
   return db
