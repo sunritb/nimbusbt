@@ -5,6 +5,16 @@ import { NAME, VERSION, ENGINE, PROTOCOLS } from '../version.js'
 const toInfoHash = v => String(v || '').toLowerCase()
 
 /**
+ * Accept a single announce URL or a comma-separated list (query params) and
+ * always produce an array, or undefined when nothing was provided.
+ */
+const toAnnounceList = v => {
+  if (v === undefined || v === null || v === '') return undefined
+  const list = Array.isArray(v) ? v : String(v).split(',')
+  return list.map(s => String(s).trim()).filter(Boolean)
+}
+
+/**
  * @param {import('../config.js').Settings} settings
  * @param {import('../engine/core.js').TorrentCore} core
  * @param {import('../db.js')} db
@@ -84,10 +94,11 @@ export function createApi (settings, core) {
         body.savePath = body.savePath ?? q.savePath
         body.private = body.private ?? (q.private === '1' || q.private === 'true')
         body.paused = body.paused ?? (q.paused === '1' || q.paused === 'true')
-        body.announce = body.announce ?? q.announce
+        body.announce = toAnnounceList(body.announce ?? q.announce)
       } else if (typeof body.magnet === 'string' && body.magnet.length) {
         torrentId = body.magnet
         addedBy = 'magnet'
+        body.announce = toAnnounceList(body.announce ?? q.announce)
       } else if (typeof body.path === 'string' && body.path.length) {
         if (!existsSync(body.path)) {
           return res.status(400).json({ error: 'Local path does not exist' })
@@ -97,7 +108,7 @@ export function createApi (settings, core) {
           const seedStatus = await core.seed(body.path, {
             savePath: body.savePath,
             private: body.private,
-            announce: body.announce
+            announce: toAnnounceList(body.announce ?? q.announce)
           })
           return res.status(201).json(seedStatus)
         }
