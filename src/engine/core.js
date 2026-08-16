@@ -503,7 +503,7 @@ export class TorrentCore extends EventEmitter {
         const buf = row?.bitfield
         const bf = buf ? new Uint8Array(buf) : new Uint8Array(Math.ceil((torrent.pieces?.length || 0) / 8))
         if (bf[idx >> 3] !== undefined) {
-          bf[idx >> 3] |= (1 << (idx & 7))
+          bf[idx >> 3] |= (0x80 >> (idx & 7))
           this._stmt('UPDATE torrents SET bitfield = ? WHERE info_hash = ?').run(Buffer.from(bf), infoHash)
         }
         this.db.exec('COMMIT')
@@ -556,7 +556,7 @@ export class TorrentCore extends EventEmitter {
     if (!torrent.bitfield || !torrent.pieces?.length) return
     const bytes = new Uint8Array(Math.ceil(torrent.pieces.length / 8))
     for (let i = 0; i < torrent.pieces.length; i++) {
-      if (torrent.bitfield.get(i)) bytes[i >> 3] |= (1 << (i & 7))
+      if (torrent.bitfield.get(i)) bytes[i >> 3] |= (0x80 >> (i & 7))
     }
     stmt.run(Buffer.from(bytes), torrent.infoHash)
   }
