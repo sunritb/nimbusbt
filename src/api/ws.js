@@ -1,4 +1,5 @@
 import { WebSocketServer } from 'ws'
+import { VERSION } from '../version.js'
 
 /**
  * WebSocket hub. Broadcasts engine events and periodic status snapshots to
@@ -37,7 +38,7 @@ export class Hub {
 
   _helloPayload () {
     return {
-      version: '0.1.0',
+      version: VERSION,
       settings: this.settings.all(),
       log: this.lastLog.slice(-200),
       ipLeakNote: this.core.ipLeakNote

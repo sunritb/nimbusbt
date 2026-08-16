@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { existsSync } from 'node:fs'
+import { NAME, VERSION, ENGINE, PROTOCOLS } from '../version.js'
 
 const toInfoHash = v => String(v || '').toLowerCase()
 
@@ -17,10 +18,10 @@ export function createApi (settings, core) {
 
   api.get('/version', (req, res) => {
     res.json({
-      name: 'NimbusBT',
-      version: '0.1.0',
-      engine: 'webtorrent',
-      protocols: ['BitTorrent v1', 'magnet', 'DHT (BEP-5)', 'PEX (BEP-11)', 'LSD (BEP-14)', 'HTTP/UDP trackers', 'Web seeds (BEP-19)', 'uTP (BEP-29, opt-in)'],
+      name: NAME,
+      version: VERSION,
+      engine: ENGINE,
+      protocols: PROTOCOLS,
       note: core.ipLeakNote
     })
   })

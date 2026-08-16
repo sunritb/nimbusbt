@@ -7,6 +7,7 @@ import { TorrentCore } from './engine/core.js'
 import { createApi } from './api/routes.js'
 import { Hub } from './api/ws.js'
 import { createAuth, isLoopback } from './api/auth.js'
+import { NAME, VERSION } from './version.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const WEB_UI = path.join(__dirname, 'webui')
@@ -98,9 +99,12 @@ export async function main (argv = process.argv.slice(2)) {
   process.on('SIGTERM', () => shutdown('SIGTERM'))
 
   const token = settings.get('api_token')
-  console.log('┌──────────────────────────────────────────────┐')
-  console.log('│  NimbusBT 0.1.0 — secure BitTorrent client  │')
-  console.log('└──────────────────────────────────────────────┘')
+  const banner = `│  ${NAME} ${VERSION} — secure BitTorrent client  │`
+  const bar = '┌' + '─'.repeat(banner.length - 2) + '┐'
+  const bottom = '└' + '─'.repeat(banner.length - 2) + '┘'
+  console.log(bar)
+  console.log(banner)
+  console.log(bottom)
   console.log(`  Web UI:  http://${settings.get('api_host')}:${addr.port}/`)
   console.log(`  REST:    http://${settings.get('api_host')}:${addr.port}/api`)
   console.log(`  WS:      ws://${settings.get('api_host')}:${addr.port}/ws`)
