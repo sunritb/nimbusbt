@@ -321,9 +321,9 @@ export class TorrentCore extends EventEmitter {
       return totalPieces > 0
     }).length || 0
 
-    const files = (torrent.files || []).map(f => ({
-      id: torrent.files.indexOf(f),
-      index: torrent.files.indexOf(f),
+    const files = (torrent.files || []).map((f, index) => ({
+      id: index,
+      index,
       name: f.name,
       path: f.path,
       length: f.length,
