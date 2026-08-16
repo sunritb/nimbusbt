@@ -28,7 +28,7 @@
     "node": ">=22.5.0"
   },
   "dependencies": {
-    "express": "^4.21.2",
+    "express": "^5.2.1",
     "socks": "^2.8.4",
     "webtorrent": "^3.0.21",
     "ws": "^8.18.0"
