@@ -1,6 +1,10 @@
 import { WebSocketServer } from 'ws'
 import { VERSION } from '../version.js'
 
+// Skip sending to a client whose socket buffer has grown past this many
+// bytes; a stalled consumer should not force us to buffer JSON forever.
+const SEND_HIGH_WATER = 1 << 20
+
 /**
  * WebSocket hub. Broadcasts engine events and periodic status snapshots to
  * connected clients. Same token auth as the REST API.
@@ -15,7 +19,11 @@ export class Hub {
     this.settings = settings
     this.core = core
     this.clients = new Set()
-    this.wss = new WebSocketServer({ server, path: '/ws' })
+    this.wss = new WebSocketServer({
+      server,
+      path: '/ws',
+      perMessageDeflate: { zlibDeflateOptions: { level: 3 } }
+    })
 
     this.wss.on('connection', (socket, req) => {
       const url = new URL(req.url, `http://${req.headers.host}`)
@@ -31,7 +39,10 @@ export class Hub {
     })
 
     this._bindCoreEvents()
-    this._ticker = setInterval(() => this.broadcast('status', this.core.getStatuses()), 1000)
+    this._ticker = setInterval(() => {
+      if (this.clients.size === 0) return
+      this.broadcast('status', this.core.getStatuses())
+    }, 1000)
     this._ticker.unref?.()
   }
 
@@ -68,7 +79,7 @@ export class Hub {
     if (this.clients.size === 0) return
     const msg = JSON.stringify({ type, data })
     for (const socket of this.clients) {
-      if (socket.readyState === 1) socket.send(msg)
+      if (socket.readyState === 1 && socket.bufferedAmount < SEND_HIGH_WATER) socket.send(msg)
     }
   }
 
