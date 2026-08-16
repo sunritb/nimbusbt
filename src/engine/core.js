@@ -12,6 +12,7 @@ const STATS_INTERVAL = 1000
 const PERSIST_INTERVAL = 30_000
 const METADATA_TIMEOUT = 120_000
 const MAX_LOG_ENTRIES = 500
+const RESTORE_CONCURRENCY = 3
 
 /**
  * Core torrent engine. Owns a single WebTorrent instance and exposes a clean,
@@ -572,7 +573,7 @@ export class TorrentCore extends EventEmitter {
 
   async _restoreFromDb () {
     const rows = this.db.prepare('SELECT * FROM torrents').all()
-    for (const row of rows) {
+    await mapLimit(rows, RESTORE_CONCURRENCY, async row => {
       const announce = row.announce ? JSON.parse(row.announce) : undefined
       const bitfield = row.bitfield ? new Uint8Array(row.bitfield) : undefined
       const opts = {
@@ -586,13 +587,12 @@ export class TorrentCore extends EventEmitter {
         opts.bitfield = bitfield
       }
       try {
-        const torrent = this._addWithTimeout(row.magnet || row.info_hash, opts, METADATA_TIMEOUT)
+        const torrent = await this._addWithTimeout(row.magnet || row.info_hash, opts, METADATA_TIMEOUT)
           .catch(err => {
             this.log(`Failed to restore ${row.info_hash}: ${err.message}`, 'error')
             return null
           })
-        const t = await torrent
-        if (t) this._track(t, {
+        if (torrent) this._track(torrent, {
           savePath: opts.path,
           isPrivate: !!row.is_private,
           paused: !!row.paused,
@@ -601,11 +601,24 @@ export class TorrentCore extends EventEmitter {
       } catch (err) {
         this.log(`Failed to restore ${row.info_hash}: ${err.message}`, 'error')
       }
-    }
+    })
   }
 
   _broadcastStatus () {
     if (this.listenerCount('status') === 0) return
     this.emit('status', this.getStatuses())
   }
+}
+
+function mapLimit (items, limit, fn) {
+  const out = new Array(items.length)
+  let next = 0
+  async function worker () {
+    while (next < items.length) {
+      const i = next++
+      out[i] = await fn(items[i], i)
+    }
+  }
+  const workers = Array.from({ length: Math.min(limit, items.length) }, () => worker())
+  return Promise.all(workers).then(() => out)
 }
