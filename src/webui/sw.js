@@ -1,5 +1,7 @@
 // NimbusBT — service worker: offline cache for app shell.
-const CACHE = 'nimbusbt-v1'
+// __NIMBUS_VERSION__ is replaced at serve time with the build version so a
+// release invalidates stale app-shell caches automatically.
+const CACHE = 'nimbusbt-__NIMBUS_VERSION__'
 const ASSETS = ['/', '/css/style.css', '/js/api.js', '/js/app.js', '/manifest.webmanifest', '/icons/icon.svg']
 
 self.addEventListener('install', e => {

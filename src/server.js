@@ -1,5 +1,6 @@
 import express from 'express'
 import path from 'node:path'
+import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { openDb } from './db.js'
 import { Settings, ensureDownloadDir } from './config.js'
@@ -70,6 +71,12 @@ export async function main (argv = process.argv.slice(2)) {
   app.use('/api', authMiddleware, createApi(settings, core))
 
   app.use(express.static(WEB_UI, { index: false, etag: true, maxAge: '1h' }))
+
+  // Version-stamped service worker: any release invalidates the old app shell.
+  app.get('/sw.js', (req, res) => {
+    const sw = readFileSync(path.join(WEB_UI, 'sw.js'), 'utf8')
+    res.type('js').send(sw.replaceAll('__NIMBUS_VERSION__', VERSION))
+  })
 
   app.get('/', (req, res) => {
     const local = isLoopback(req)
