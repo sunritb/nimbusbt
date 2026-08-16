@@ -197,7 +197,16 @@ export function createApi (settings, core) {
   /* --------------------------------- log --------------------------------- */
 
   api.get('/log', (req, res) => {
-    res.json([])
+    const limit = Number(req.query.limit) || 200
+    const level = req.query.level
+    let entries = core.getLog(limit)
+    if (level) entries = entries.filter(e => e.level === String(level))
+    res.json(entries)
+  })
+
+  api.delete('/log', (req, res) => {
+    core.logBuffer = []
+    res.status(204).end()
   })
 
   return api

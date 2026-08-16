@@ -15,7 +15,6 @@ export class Hub {
     this.settings = settings
     this.core = core
     this.clients = new Set()
-    this.lastLog = []
     this.wss = new WebSocketServer({ server, path: '/ws' })
 
     this.wss.on('connection', (socket, req) => {
@@ -40,15 +39,13 @@ export class Hub {
     return {
       version: VERSION,
       settings: this.settings.all(),
-      log: this.lastLog.slice(-200),
+      log: this.core.getLog(200),
       ipLeakNote: this.core.ipLeakNote
     }
   }
 
   _bindCoreEvents () {
     this.core.on('log', entry => {
-      this.lastLog.push(entry)
-      if (this.lastLog.length > 500) this.lastLog.splice(0, this.lastLog.length - 500)
       this.broadcast('log', entry)
     })
     this.core.on('torrent', infoHash => this._broadcastTorrent(infoHash))

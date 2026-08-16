@@ -11,6 +11,7 @@ import { upsert } from '../db.js'
 const STATS_INTERVAL = 1000
 const PERSIST_INTERVAL = 30_000
 const METADATA_TIMEOUT = 120_000
+const MAX_LOG_ENTRIES = 500
 
 /**
  * Core torrent engine. Owns a single WebTorrent instance and exposes a clean,
@@ -37,6 +38,7 @@ export class TorrentCore extends EventEmitter {
     this._persistTimer = null
     this._peerId = null
     this._stmtCache = new Map()
+    this.logBuffer = []
   }
 
   _stmt (sql) {
@@ -50,7 +52,17 @@ export class TorrentCore extends EventEmitter {
 
   log (msg, level = 'info') {
     const entry = { time: Date.now(), level, msg: String(msg) }
+    this.logBuffer.push(entry)
+    if (this.logBuffer.length > MAX_LOG_ENTRIES) {
+      this.logBuffer.splice(0, this.logBuffer.length - MAX_LOG_ENTRIES)
+    }
     this.emit('log', entry)
+  }
+
+  /** @returns {Array} a copy of the last N log entries */
+  getLog (limit = 200) {
+    const n = Math.max(0, Number(limit) || 0)
+    return n > 0 ? this.logBuffer.slice(-n) : this.logBuffer.slice()
   }
 
   async start () {
