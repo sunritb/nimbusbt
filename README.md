@@ -25,7 +25,9 @@ Built on Node.js + WebTorrent. Works on macOS, Linux, and Windows.
 | Malware scan hook + VirusTotal lookup by info hash | ✓ |
 | Responsive web UI (PWA) with live WebSocket updates | ✓ |
 | REST + WebSocket API, bearer-token auth, CORS, CSP | ✓ |
-| CLI (`nimbusbt add/list/status/...`) | ✓ |
+| API login rate-limiting (429 on repeated bad tokens) | ✓ |
+| Paginated / filtered torrent listing + aggregate summary | ✓ |
+| CLI (`nimbusbt add/list/status/...` incl. `--json`) | ✓ |
 | Cross-platform desktop launch (`npm run desktop`) | ✓ |
 
 Known limitation: wire encryption (MSE/PE) is not provided by the underlying
@@ -49,11 +51,15 @@ first run, shown in the server banner). From the CLI:
 
 ```sh
 npm run cli -- add <magnet-or-torrent-file-or-url>
-npm run cli -- list
-npm run cli -- status <infoHash>
+npm run cli -- seed <path> [--path DIR]
+npm run cli -- list [--json]
+npm run cli -- summary
+npm run cli -- status <infoHash> [--json]
 npm run cli -- pause <infoHash>
 npm run cli -- resume <infoHash>
-npm run cli -- settings
+npm run cli -- recheck <infoHash>
+npm run cli -- scan <infoHash>
+npm run cli -- settings [--json]
 npm run cli -- remove <infoHash>
 ```
 
@@ -64,12 +70,16 @@ token, blocklist, proxy, and speed schedule can be changed from the web UI
 ## API
 
 - `GET /api/health`
-- `GET /api/torrents`, `POST /api/torrents` (raw `.torrent` body or JSON `{magnet}`)
+- `GET /api/torrents?state=downloading|seeding|paused|active&limit=50&offset=0`, `POST /api/torrents`
+- `GET /api/torrents/summary`
 - `GET /api/torrents/:hash`, `POST /api/torrents/:hash/pause|resume|recheck`, `DELETE /api/torrents/:hash`
+- `POST /api/torrents/:hash/files/:idx/priority`, `POST /api/torrents/:hash/scan|virustotal`
 - `GET/PUT /api/settings`
+- `GET /api/log?limit=200&level=warn`, `DELETE /api/log`
 - `WS /ws` — live status + `torrent` / `done` / `removed` events
 
 Authenticate with the header `x-nimbus-token: <token>` (or `?token=`).
+Failed auth is rate-limited per source IP.
 
 ## Security
 
