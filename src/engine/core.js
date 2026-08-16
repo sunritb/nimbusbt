@@ -582,6 +582,7 @@ export class TorrentCore extends EventEmitter {
   }
 
   _broadcastStatus () {
+    if (this.listenerCount('status') === 0) return
     this.emit('status', this.getStatuses())
   }
 }
