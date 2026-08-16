@@ -94,33 +94,55 @@ function countEntries (source) {
  * Run a malware scanner against a directory/file list.
  * If `scannerCommand` is configured it is used; otherwise falls back to
  * `clamscan -r` if present on PATH.
+ *
+ * Output buffers are capped to prevent unbounded memory growth and the child
+ * is SIGKILLed if it does not exit within `timeoutMs`.
  * @param {string[]} targets absolute file/dir paths
  * @param {string} [scannerCommand]
+ * @param {number} [timeoutMs]
  * @returns {Promise<{status: 'clean'|'infected'|'error', detail: string}>}
  */
-export function scanPaths (targets, scannerCommand = '') {
+export function scanPaths (targets, scannerCommand = '', timeoutMs = 10 * 60 * 1000) {
   return new Promise((resolve) => {
-    const cmd = scannerCommand || 'clamscan'
-    const args = scannerCommand ? cmd.split(/\s+/).slice(1) : ['-r']
-    const bin = scannerCommand ? cmd.split(/\s+/)[0] : 'clamscan'
+    const parts = scannerCommand ? scannerCommand.trim().split(/\s+/) : []
+    const bin = parts[0] || 'clamscan'
+    const args = scannerCommand ? parts.slice(1) : ['-r']
     const proc = spawn(bin, [...args, ...targets], { stdio: ['ignore', 'pipe', 'pipe'] })
     let out = ''
     let err = ''
-    proc.stdout.on('data', d => { out += d })
-    proc.stderr.on('data', d => { err += d })
+    let done = false
+    const MAX_OUT = 64 * 1024
+    const finish = (value) => {
+      if (done) return
+      done = true
+      clearTimeout(timer)
+      if (proc.exitCode === null) proc.kill('SIGKILL')
+      resolve(value)
+    }
+    proc.stdout.on('data', d => {
+      if (out.length < MAX_OUT) out += d
+    })
+    proc.stderr.on('data', d => {
+      if (err.length < MAX_OUT) err += d
+    })
     proc.on('error', (e) => {
-      resolve({ status: 'error', detail: `Scanner unavailable: ${e.message}` })
+      finish({ status: 'error', detail: `Scanner unavailable: ${e.message}` })
     })
     proc.on('close', (code) => {
+      if (done) return
       const lower = out.toLowerCase()
       if (code === 0 || lower.includes('no virus') || lower.includes('clean')) {
-        resolve({ status: 'clean', detail: out.trim() || 'No threats found.' })
+        finish({ status: 'clean', detail: out.trim() || 'No threats found.' })
       } else if (lower.includes('found') || code === 1) {
-        resolve({ status: 'infected', detail: out.trim() || 'Infection reported.' })
+        finish({ status: 'infected', detail: out.trim() || 'Infection reported.' })
       } else {
-        resolve({ status: 'error', detail: err.trim() || out.trim() || `Exited with code ${code}` })
+        finish({ status: 'error', detail: err.trim() || out.trim() || `Exited with code ${code}` })
       }
     })
+    const timer = setTimeout(() => {
+      finish({ status: 'error', detail: `Scanner timed out after ${Math.round(timeoutMs / 1000)}s` })
+    }, timeoutMs)
+    timer.unref?.()
   })
 }
 

@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { hostOf, parsePeerGuardian } from '../../src/engine/security.js'
+import { hostOf, parsePeerGuardian, scanPaths } from '../../src/engine/security.js'
 
 test('hostOf strips IPv4 port', () => {
   assert.equal(hostOf('192.168.1.1:6881'), '192.168.1.1')
@@ -33,4 +33,32 @@ test('parsePeerGuardian handles comment + range, single IP, CIDR, comments', () 
 
 test('parsePeerGuardian ignores garbage', () => {
   assert.deepEqual(parsePeerGuardian('not an ip\n###\n'), [])
+})
+
+test('scanPaths reports clean on exit code 0', async () => {
+  const res = await scanPaths(['/tmp/nonexistent'], 'node -e process.exit(0)')
+  assert.equal(res.status, 'clean')
+})
+
+test('scanPaths reports infected on exit code 1', async () => {
+  const res = await scanPaths(['/tmp/nonexistent'], 'node -e process.exit(1)')
+  assert.equal(res.status, 'infected')
+})
+
+test('scanPaths surfaces a missing scanner binary', async () => {
+  const res = await scanPaths(['/tmp/nonexistent'], 'nimbusbt-no-such-scanner-xyz')
+  assert.equal(res.status, 'error')
+  assert.match(res.detail, /unavailable/i)
+})
+
+test('scanPaths kills and reports a hung scanner after the timeout', async () => {
+  const t0 = Date.now()
+  const res = await scanPaths(
+    ['/tmp/nonexistent'],
+    'node -e setTimeout(function(){process.exit(0)},30000)',
+    400
+  )
+  assert.equal(res.status, 'error')
+  assert.match(res.detail, /timed out/i)
+  assert.ok(Date.now() - t0 < 5000, 'timeout must not wait for the child')
 })
