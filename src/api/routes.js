@@ -23,7 +23,16 @@ export function createApi (settings, core) {
   const api = Router()
 
   api.get('/health', (req, res) => {
-    res.json({ status: 'ok', started: core.started, torrents: core.torrents.size })
+    res.json({
+      status: 'ok',
+      started: core.started,
+      torrents: core.torrents.size,
+      version: VERSION,
+      uptime: core.started ? Math.round(process.uptime()) : 0,
+      memoryRss: process.memoryUsage().rss,
+      node: process.version,
+      platform: process.platform
+    })
   })
 
   api.get('/version', (req, res) => {
