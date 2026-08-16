@@ -35,6 +35,16 @@ export class TorrentCore extends EventEmitter {
     this._statsTimer = null
     this._persistTimer = null
     this._peerId = null
+    this._stmtCache = new Map()
+  }
+
+  _stmt (sql) {
+    let stmt = this._stmtCache.get(sql)
+    if (!stmt) {
+      stmt = this.db.prepare(sql)
+      this._stmtCache.set(sql, stmt)
+    }
+    return stmt
   }
 
   log (msg, level = 'info') {
@@ -187,10 +197,10 @@ export class TorrentCore extends EventEmitter {
     this.meta.delete(infoHash)
     const removeOpts = { destroyStore: !!opts.deleteFiles }
     await new Promise(resolve => this.client.remove(infoHash, removeOpts, () => resolve()))
-    this.db.prepare('DELETE FROM torrents WHERE info_hash = ?').run(infoHash)
-    this.db.prepare('DELETE FROM files WHERE info_hash = ?').run(infoHash)
-    this.db.prepare('DELETE FROM peers WHERE info_hash = ?').run(infoHash)
-    this.db.prepare('DELETE FROM trackers WHERE info_hash = ?').run(infoHash)
+    this._stmt('DELETE FROM torrents WHERE info_hash = ?').run(infoHash)
+    this._stmt('DELETE FROM files WHERE info_hash = ?').run(infoHash)
+    this._stmt('DELETE FROM peers WHERE info_hash = ?').run(infoHash)
+    this._stmt('DELETE FROM trackers WHERE info_hash = ?').run(infoHash)
     this.log(`Removed torrent ${name}`)
     this.emit('removed', { infoHash, name })
   }
@@ -198,14 +208,14 @@ export class TorrentCore extends EventEmitter {
   async pause (infoHash) {
     const torrent = this._get(infoHash)
     torrent.pause()
-    this.db.prepare('UPDATE torrents SET paused = 1 WHERE info_hash = ?').run(infoHash)
+    this._stmt('UPDATE torrents SET paused = 1 WHERE info_hash = ?').run(infoHash)
     this.log(`Paused ${torrent.name || infoHash}`)
   }
 
   async resume (infoHash) {
     const torrent = this._get(infoHash)
     torrent.resume()
-    this.db.prepare('UPDATE torrents SET paused = 0 WHERE info_hash = ?').run(infoHash)
+    this._stmt('UPDATE torrents SET paused = 0 WHERE info_hash = ?').run(infoHash)
     this.log(`Resumed ${torrent.name || infoHash}`)
   }
 
@@ -239,7 +249,7 @@ export class TorrentCore extends EventEmitter {
     if (!file) throw new Error(`No file at index ${fileIdx}`)
     if (priority > 0) file.select(priority)
     else if (priority === 0) file.deselect()
-    this.db.prepare('UPDATE files SET priority = ? WHERE info_hash = ? AND idx = ?')
+    this._stmt('UPDATE files SET priority = ? WHERE info_hash = ? AND idx = ?')
       .run(priority, infoHash, fileIdx)
     this.log(`Priority for ${file.name} set to ${priority}`)
   }
@@ -489,12 +499,12 @@ export class TorrentCore extends EventEmitter {
     torrent.on('verified', idx => {
       this.db.exec('BEGIN')
       try {
-        const row = this.db.prepare('SELECT bitfield FROM torrents WHERE info_hash = ?').get(infoHash)
+        const row = this._stmt('SELECT bitfield FROM torrents WHERE info_hash = ?').get(infoHash)
         const buf = row?.bitfield
         const bf = buf ? new Uint8Array(buf) : new Uint8Array(Math.ceil((torrent.pieces?.length || 0) / 8))
         if (bf[idx >> 3] !== undefined) {
           bf[idx >> 3] |= (1 << (idx & 7))
-          this.db.prepare('UPDATE torrents SET bitfield = ? WHERE info_hash = ?').run(Buffer.from(bf), infoHash)
+          this._stmt('UPDATE torrents SET bitfield = ? WHERE info_hash = ?').run(Buffer.from(bf), infoHash)
         }
         this.db.exec('COMMIT')
       } catch {
