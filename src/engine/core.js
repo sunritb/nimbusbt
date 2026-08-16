@@ -528,21 +528,27 @@ export class TorrentCore extends EventEmitter {
   }
 
   _persistAll () {
-    for (const torrent of this.torrents.values()) {
-      try {
-        this._persistBitfield(torrent)
-      } catch { /* ignore */ }
+    const stmt = this.db.prepare('UPDATE torrents SET bitfield = ? WHERE info_hash = ?')
+    this.db.exec('BEGIN')
+    try {
+      for (const torrent of this.torrents.values()) {
+        try {
+          this._persistBitfield(torrent, stmt)
+        } catch { /* ignore */ }
+      }
+      this.db.exec('COMMIT')
+    } catch {
+      this.db.exec('ROLLBACK')
     }
   }
 
-  _persistBitfield (torrent) {
+  _persistBitfield (torrent, stmt = this.db.prepare('UPDATE torrents SET bitfield = ? WHERE info_hash = ?')) {
     if (!torrent.bitfield || !torrent.pieces?.length) return
     const bytes = new Uint8Array(Math.ceil(torrent.pieces.length / 8))
     for (let i = 0; i < torrent.pieces.length; i++) {
       if (torrent.bitfield.get(i)) bytes[i >> 3] |= (1 << (i & 7))
     }
-    this.db.prepare('UPDATE torrents SET bitfield = ? WHERE info_hash = ?')
-      .run(Buffer.from(bytes), torrent.infoHash)
+    stmt.run(Buffer.from(bytes), torrent.infoHash)
   }
 
   async _restoreFromDb () {
