@@ -60,8 +60,42 @@ export function effectiveLimits (rules, base, now = new Date()) {
 }
 
 /**
- * Scheduler that re-applies limits whenever an active rule changes
- * (checked every 30 seconds and at each setLimits call).
+ * Milliseconds until the next rule boundary (a rule start or end), or null
+ * when no boundaries exist. Used to schedule precise limit re-applications
+ * instead of polling every N seconds.
+ * @param {Array} rules
+ * @param {Date} [now]
+ * @returns {number|null}
+ */
+export function nextRuleChange (rules, now = new Date()) {
+  if (!Array.isArray(rules) || rules.length === 0) return null
+  const boundaries = new Set()
+  for (const rule of rules) {
+    if (Array.isArray(rule.days) && rule.days.length === 0) continue
+    boundaries.add(minutesOfDay(rule.start))
+    boundaries.add(minutesOfDay(rule.end))
+  }
+  if (boundaries.size === 0) return null
+  const nowMin = now.getHours() * 60 + now.getMinutes()
+  const nowMs = now.getTime()
+  let best = Infinity
+  for (const m of boundaries) {
+    if (m > nowMin) {
+      const t = new Date(now)
+      t.setHours(0, m, 0, 0)
+      best = Math.min(best, t.getTime() - nowMs)
+    }
+    const tomorrow = new Date(now)
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    tomorrow.setHours(0, m, 0, 0)
+    best = Math.min(best, tomorrow.getTime() - nowMs)
+  }
+  return best
+}
+
+/**
+ * Scheduler that re-applies limits at every rule boundary, plus on each
+ * refresh() call. When no rules are configured it idles without a timer.
  */
 export class SpeedScheduler {
   /**
@@ -75,21 +109,35 @@ export class SpeedScheduler {
     this.base = base
     this.rules = rules
     this.timer = null
+    this._onTimer = () => this._scheduleAndApply()
   }
 
   start () {
-    this.refresh()
-    this.timer = setInterval(() => this.refresh(), 30_000)
-    this.timer.unref?.()
+    this._scheduleAndApply()
   }
 
   stop () {
-    if (this.timer) clearInterval(this.timer)
-    this.timer = null
+    this._clear()
   }
 
   refresh () {
-    const limits = effectiveLimits(this.rules(), this.base())
-    this.apply(limits)
+    this._scheduleAndApply()
+  }
+
+  _clear () {
+    if (this.timer) {
+      clearTimeout(this.timer)
+      this.timer = null
+    }
+  }
+
+  _scheduleAndApply () {
+    this.apply(effectiveLimits(this.rules(), this.base()))
+    this._clear()
+    const delay = nextRuleChange(this.rules(), new Date())
+    if (delay === null || !Number.isFinite(delay)) return
+    // Cap so clock changes or system sleep still re-evaluate periodically.
+    this.timer = setTimeout(this._onTimer, Math.min(delay, 6 * 60 * 60 * 1000))
+    this.timer.unref?.()
   }
 }

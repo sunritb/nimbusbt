@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { minutesOfDay, activeRule, effectiveLimits, SpeedScheduler } from '../../src/engine/scheduler.js'
+import { minutesOfDay, activeRule, effectiveLimits, nextRuleChange, SpeedScheduler } from '../../src/engine/scheduler.js'
 
 const at = (hhmm, day) => {
   const d = new Date(2026, 0, 4 + day) // 2026-01-04 is a Sunday (getDay()=0)
@@ -64,4 +64,52 @@ test('SpeedScheduler applies limits on start and refresh', () => {
   assert.equal(applied.length, 1)
   assert.deepEqual(applied[0], { download: 0, upload: 0 })
   scheduler.stop()
+})
+
+test('nextRuleChange returns ms until the next boundary', () => {
+  const rules = [{ start: '09:00', end: '17:00', download: 0 }]
+  assert.equal(nextRuleChange(rules, at('10:00', 1)), 7 * 3600 * 1000)
+  assert.equal(nextRuleChange(rules, at('08:00', 1)), 3600 * 1000)
+  assert.equal(nextRuleChange(rules, at('17:30', 1)), 15.5 * 3600 * 1000)
+})
+
+test('nextRuleChange wraps past midnight', () => {
+  const rules = [{ start: '22:00', end: '06:00', download: 0 }]
+  assert.equal(nextRuleChange(rules, at('23:30', 0)), 6.5 * 3600 * 1000)
+  assert.equal(nextRuleChange(rules, at('05:00', 1)), 3600 * 1000)
+})
+
+test('nextRuleChange returns null without rules', () => {
+  assert.equal(nextRuleChange([]), null)
+  assert.equal(nextRuleChange(null), null)
+})
+
+test('SpeedScheduler idles without a timer when no rules are set', () => {
+  let applied = 0
+  const scheduler = new SpeedScheduler({
+    apply: () => { applied++ },
+    base: () => ({ download: -1, upload: -1 }),
+    rules: () => []
+  })
+  scheduler.start()
+  assert.equal(applied, 1)
+  assert.equal(scheduler.timer, null)
+  scheduler.stop()
+  assert.equal(applied, 1)
+})
+
+test('SpeedScheduler schedules a boundary timer and applies on refresh', () => {
+  let applied = 0
+  const scheduler = new SpeedScheduler({
+    apply: () => { applied++ },
+    base: () => ({ download: -1, upload: -1 }),
+    rules: () => [{ start: '00:00', end: '23:59', download: 0, upload: 0 }]
+  })
+  scheduler.start()
+  assert.ok(scheduler.timer && typeof scheduler.timer.ref === 'function')
+  assert.equal(applied, 1)
+  scheduler.refresh()
+  assert.equal(applied, 2)
+  scheduler.stop()
+  assert.equal(scheduler.timer, null)
 })
