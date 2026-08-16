@@ -29,7 +29,38 @@ export function createApi (settings, core) {
   /* ------------------------------- torrents ------------------------------ */
 
   api.get('/torrents', (req, res) => {
-    res.json(core.getStatuses())
+    let list = core.getStatuses()
+    const { state, offset, limit } = req.query
+    if (state) {
+      const wanted = String(state).toLowerCase()
+      list = list.filter(t => {
+        if (wanted === 'done' || wanted === 'seeding') return t.done
+        if (wanted === 'downloading') return !t.done && !t.paused
+        if (wanted === 'paused') return t.paused
+        if (wanted === 'active') return !t.paused
+        return true
+      })
+    }
+    const off = Math.max(0, Number(offset) || 0)
+    const lim = Number(limit)
+    if (Number.isInteger(lim) && lim > 0) list = list.slice(off, off + lim)
+    else if (off > 0) list = list.slice(off)
+    res.json(list)
+  })
+
+  api.get('/torrents/summary', (req, res) => {
+    const list = core.getStatuses()
+    res.json({
+      total: list.length,
+      downloading: list.filter(t => !t.done && !t.paused).length,
+      seeding: list.filter(t => t.done).length,
+      paused: list.filter(t => t.paused).length,
+      active: list.filter(t => !t.paused).length,
+      bytesDownloaded: list.reduce((n, t) => n + (t.downloaded || 0), 0),
+      bytesUploaded: list.reduce((n, t) => n + (t.uploaded || 0), 0),
+      downloadSpeed: list.reduce((n, t) => n + (t.downloadSpeed || 0), 0),
+      uploadSpeed: list.reduce((n, t) => n + (t.uploadSpeed || 0), 0)
+    })
   })
 
   api.get('/torrents/:infoHash', (req, res) => {
