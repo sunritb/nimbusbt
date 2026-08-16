@@ -440,6 +440,13 @@ export class TorrentCore extends EventEmitter {
   _addWithTimeout (torrentId, addOpts, timeoutMs) {
     return new Promise((resolve, reject) => {
       let done = false
+      let torrent
+      const cleanup = () => {
+        if (!torrent) return
+        try {
+          torrent.destroy({ destroyStore: false }, () => {})
+        } catch { /* already gone */ }
+      }
       const finish = (fn, arg) => {
         if (done) return
         done = true
@@ -447,19 +454,19 @@ export class TorrentCore extends EventEmitter {
         fn(arg)
       }
       const timer = setTimeout(() => {
+        cleanup()
         finish(reject, new Error('Timed out fetching torrent metadata (no seeds for magnet?)'))
       }, timeoutMs)
-      let torrent
+      timer.unref?.()
       try {
         torrent = this.client.add(torrentId, addOpts, () => finish(resolve, torrent))
       } catch (err) {
         finish(reject, err)
       }
       torrent.on('error', err => {
-        if (!done) {
-          finish(reject, err)
-          if (torrent.infoHash) this.client.remove(torrent.infoHash, {}, () => {})
-        }
+        if (done) return
+        finish(reject, err)
+        cleanup()
       })
       torrent.on('warning', warn => this.log(`Torrent warning: ${warn.message}`, 'warning'))
     })
