@@ -311,14 +311,10 @@ export class TorrentCore extends EventEmitter {
   snapshot (torrent) {
     const pieces = torrent.pieces || []
     const totalPieces = pieces.length
-    let havePieces = 0
-    if (torrent.bitfield) {
-      for (let i = 0; i < totalPieces; i++) if (torrent.bitfield.get(i)) havePieces++
-    }
+    const havePieces = torrent.bitfield ? countSetBits(torrent.bitfield.buffer, totalPieces) : 0
     const seeders = torrent.wires?.filter(w => {
       if (!w.peerPieces) return false
-      for (let i = 0; i < totalPieces; i++) if (!w.peerPieces.get(i)) return false
-      return totalPieces > 0
+      return totalPieces > 0 && countSetBits(w.peerPieces.buffer, totalPieces) === totalPieces
     }).length || 0
 
     const files = (torrent.files || []).map((f, index) => ({
@@ -336,7 +332,9 @@ export class TorrentCore extends EventEmitter {
     const peers = []
     for (const peer of (torrent._peers?.values() || [])) {
       const wire = peer.wire
-      const progress = wire?.peerPieces ? countSet(wire.peerPieces, totalPieces) / Math.max(totalPieces, 1) : 0
+      const progress = wire?.peerPieces
+        ? countSetBits(wire.peerPieces.buffer, totalPieces) / Math.max(totalPieces, 1)
+        : 0
       peers.push({
         address: peer.addr || '',
         addr: peer.addr || '',
@@ -587,8 +585,17 @@ export class TorrentCore extends EventEmitter {
   }
 }
 
-function countSet (bitfield, total) {
+const POPCOUNT = new Uint8Array(256)
+for (let i = 0; i < 256; i++) POPCOUNT[i] = (i & 1) + POPCOUNT[i >> 1]
+
+function countSetBits (buf, total) {
+  if (!buf) return 0
+  const full = Math.min(Math.floor(total / 8), buf.length)
   let n = 0
-  for (let i = 0; i < total; i++) if (bitfield.get(i)) n++
+  for (let i = 0; i < full; i++) n += POPCOUNT[buf[i]]
+  const tail = total & 7
+  if (tail && full < buf.length) {
+    n += POPCOUNT[buf[full] & (0xff << (8 - tail))]
+  }
   return n
 }
