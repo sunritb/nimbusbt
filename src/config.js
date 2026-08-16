@@ -82,8 +82,28 @@ export class Settings {
     return value
   }
 
+  /**
+   * Apply several settings atomically. All keys are validated before any write
+   * and the batch commits in a single transaction, so a bad key or DB error
+   * leaves neither the store nor the database half-updated.
+   * @param {Record<string, unknown>} updates
+   */
   setMany (updates) {
-    for (const [key, value] of Object.entries(updates)) this.set(key, value)
+    const entries = Object.entries(updates)
+    for (const [key] of entries) {
+      if (!(key in DEFAULTS)) throw new Error(`Unknown setting: ${key}`)
+    }
+    const stmt = this.db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)')
+    this.db.exec('BEGIN')
+    try {
+      for (const [key, value] of entries) stmt.run(key, JSON.stringify(value))
+      this.db.exec('COMMIT')
+    } catch (err) {
+      this.db.exec('ROLLBACK')
+      throw err
+    }
+    for (const [key, value] of entries) this.store[key] = value
+    return this
   }
 
   /** @returns {Record<string, unknown>} snapshot of all settings */
