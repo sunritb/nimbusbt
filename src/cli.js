@@ -122,6 +122,36 @@ async function cmdResume (config, args) {
   console.log(`Resumed ${args[0]}`)
 }
 
+async function cmdRecheck (config, args) {
+  if (!args.length) throw new Error('Usage: nimbus recheck <infoHash>')
+  const t = await call(config, 'PATCH', `/api/torrents/${args[0].toLowerCase()}`, { action: 'recheck' })
+  console.log(`Rechecked ${t.name} (${t.infoHash}) — ${Math.round(t.progress * 100)}%`)
+}
+
+async function cmdSeed (config, args) {
+  if (!args.length) throw new Error('Usage: nimbus seed <path> [--path DIR] [--private]')
+  const opts = {}
+  for (let i = 1; i < args.length; i++) {
+    if (args[i] === '--path') opts.savePath = args[++i]
+    else if (args[i] === '--private') opts.private = true
+  }
+  const t = await call(config, 'POST', '/api/torrents', { path: args[0], ...opts })
+  console.log(`Seeding ${t.name} (${t.infoHash})`)
+}
+
+async function cmdScan (config, args) {
+  if (!args.length) throw new Error('Usage: nimbus scan <infoHash>')
+  const res = await call(config, 'POST', `/api/torrents/${args[0].toLowerCase()}/scan`)
+  console.log(`Scan: ${res.status} — ${res.detail}`)
+}
+
+async function cmdSummary (config) {
+  const s = await call(config, 'GET', '/api/torrents/summary')
+  console.log(`Torrents: ${s.total} (${s.downloading} downloading, ${s.seeding} seeding, ${s.paused} paused)`)
+  console.log(`Downloaded: ${fmtBytes(s.bytesDownloaded)}   Uploaded: ${fmtBytes(s.bytesUploaded)}`)
+  console.log(`Speed: ↓${fmtBytes(s.downloadSpeed)}/s  ↑${fmtBytes(s.uploadSpeed)}/s`)
+}
+
 async function cmdRemove (config, args) {
   if (!args.length) throw new Error('Usage: nimbus remove <infoHash> [--delete-files]')
   const deleteFiles = args.includes('--delete-files')
@@ -153,10 +183,14 @@ Usage: nimbus <command> [args]
 
 Commands:
   add <magnet|.torrent|path> [--path DIR] [--paused] [--private]
+  seed <path> [--path DIR] [--private]
   list                          list torrents
+  summary                       aggregate stats
   status <infoHash>             show one torrent
   pause <infoHash>
   resume <infoHash>
+  recheck <infoHash>            re-verify pieces against disk
+  scan <infoHash>               run the malware scanner on a torrent
   remove <infoHash> [--delete-files]
   settings                      show all settings
   settings --key value ...      update settings (e.g. --download_limit 1024)
@@ -169,10 +203,14 @@ Host:   NIMBUSBT_HOST / NIMBUSBT_PORT (default 127.0.0.1:5050)
 
 const COMMANDS = {
   add: cmdAdd,
+  seed: cmdSeed,
   list: cmdList,
+  summary: cmdSummary,
   status: cmdStatus,
   pause: cmdPause,
   resume: cmdResume,
+  recheck: cmdRecheck,
+  scan: cmdScan,
   remove: cmdRemove,
   settings: cmdSettings,
   version: async () => {
